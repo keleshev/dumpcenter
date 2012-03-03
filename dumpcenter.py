@@ -5,6 +5,21 @@ from fnmatch import fnmatchcase
 from datetime import datetime
 
 
+#def serialize(obj):
+#    def datetime_handler(obj):
+#        if hasattr(obj, 'isoformat'):
+#            return obj.isoformat()
+#        else:
+#            raise TypeError
+#    message = json.dumps(obj, default=datetime_handler)
+#    assert '\n' not in message
+#    return message
+
+
+#def deserialize(message):
+#    return json.loads(message)
+
+
 class DumpProtocol(object):
 
     def __init__(self, address='localhost:1042', client=None):
@@ -19,7 +34,6 @@ class DumpProtocol(object):
         return self
 
     def send(self, message):
-        assert '\n' not in json.dumps(message)
         self._client.send(json.dumps(message) + '\n')
 
     def receive(self):
@@ -37,7 +51,8 @@ class DumpProtocol(object):
 
 class DumpCenterServer(object):
 
-    def __init__(self, port=1042):
+    def __init__(self, port=1042, period=0.5):
+        self.period = period
         self.state = {}
         self.server = socket.socket()
         #self.server.bind((socket.gethostname(), port))
@@ -58,6 +73,12 @@ class DumpCenterServer(object):
         #self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
 
+    def _truncate(self):
+        now = datetime.now()
+        for key in self.state:
+            self.state[key] = [(t, v) for (t, v) in self.state[key]
+                               if (now - t).seconds > self.period]
+
     def _is_pattern(self, s):
         return '*' in s or '?' in s or '[' in s or ']' in s
 
@@ -72,29 +93,32 @@ class DumpCenterServer(object):
         keys_match = dict((key, self.state.get(key)) for key in keys)
         return dict(patterns_match.items() + keys_match.items())
 
-
     def get_request(self, arguments):
         argument, options = arguments
-        def is_pattern(s):
-            return '*' in s or '?' in s or '[' in s or ']' in s
-        if len(argument) == 1 and not is_pattern(argument[0]):
-            return self.state.get(argument[0])
-        patterns = [a for a in argument if is_pattern(a)]
-        keys = [a for a in argument if not is_pattern(a)]
-        patterns_match = {}
-        for p in patterns:
-            for k in self.state.keys():
-                if fnmatchcase(k, p):
-                    patterns_match[k] = self.state.get(k)
-        keys_match = dict((key, self.state.get(key)) for key in keys)
-        return dict(patterns_match.items() + keys_match.items())
+        #self._truncate()
+        match = self._get_match(argument)
+        if options.get('period'):
+            for key in match:
+                if match[key]:
+                    match[key] = zip(*match[key])[1]
+                else:
+                    match[key] = None
+        else:
+            for key in match:
+                if match[key]:
+                    match[key] = match[key][-1][1]
+                else:
+                    match[key] = None
+        if len(argument) == 1 and not self._is_pattern(argument[0]):
+            return match.get(argument[0])
+        return match
 
     def set_request(self, data):
         for key, value in data.items():
-            self.state[key] = value
-            #if key not in self.state:
-            #    self.state[key] = []
-            #self.state[key].append((datetime.now().isoformat(), value))
+            #self.state[key] = value
+            if key not in self.state:
+                self.state[key] = []
+            self.state[key].append((datetime.now().isoformat(), value))
 
 
 class DumpCenter(object):

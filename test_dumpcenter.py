@@ -1,7 +1,7 @@
 #from threading import Thread
 #from multiprocessing import Process
 #from time import sleep
-
+from time import sleep
 from dumpcenter import DumpCenter#, DumpCenterServer
 
 #thread = None
@@ -78,13 +78,28 @@ def test_pattern_and_name(dump):
     message = {'meanSpeed': 1, 'rpm1': 3, 'rpm2': 4}
     assert dump.get('rpm[12]', 'meanSpeed') == message
 
-#def test_gets_latest_value(dump):
+
+def test_gets_latest_value(dump):
+    dump.set(a=0, b=1, foo=-1)
+    dump.set(a=5, b=6, foo=-2)
+    dump.set(a=8, b=9, foo=-3)
+    assert dump.get('?') == {'a': 8, 'b': 9}
+
 
 def test_period(dump):
     dump.set(a=0, b=1, foo=-1)
     dump.set(a=5, b=6, foo=-2)
     dump.set(a=8, b=9, foo=-3)
     assert dump.get('?', period=1) == {'a': [0, 5, 8], 'b': [1, 6, 9]}
+
+
+def test_old_values_are_discarded(dump):
+    dump.set(a=0, b=1, foo=-1)
+    sleep(0.5)
+    dump.set(a=5, b=6, foo=-2)
+    dump.set(a=8, b=9, foo=-3)
+    assert dump.get('?', period=1) == {'a': [5, 8], 'b': [6, 9]}
+
 
 #def test_timestamps():
 #def test_period_with_timestamps():

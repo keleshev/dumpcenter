@@ -42,11 +42,18 @@ def test_get_two_values(dump):
     assert dump.get('foo bar') == {'foo': 123, 'bar': True}
 
 
-def test_clr(dump):
+def test_clr_one_value(dump):
+    dump.set(foo=123)
+    assert dump.get('foo') == 123
+    dump.clr()
+    assert dump.get('foo') == None
+
+
+def test_clr_two_values(dump):
     dump.set(foo=123, bar=True)
     assert dump.get('foo bar') == {'foo': 123, 'bar': True}
     dump.clr()
-    assert dump.get('foo bar') == {'foo': None, 'bar': None}  # HACK
+    assert dump.get('foo bar') == {'foo': None, 'bar': None}
 
 #def test_wilecard():
 #def test_pattern():

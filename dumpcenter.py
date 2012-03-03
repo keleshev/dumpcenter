@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 import socket
 import json
-#from datetime import datetime
+from fnmatch import fnmatchcase
+from datetime import datetime
 
 
 class DumpProtocol(object):
@@ -57,18 +58,43 @@ class DumpCenterServer(object):
         #self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
 
-    def get_request(self, pattern):
-        keys = pattern.split()
-        if keys[0] == pattern:
-            return self.state.get(pattern)
-        return dict((k, self.state.get(k)) for k in keys)
+    def _is_pattern(self, s):
+        return '*' in s or '?' in s or '[' in s or ']' in s
+
+    def _get_match(self, argument):
+        patterns = [a for a in argument if self._is_pattern(a)]
+        keys = [a for a in argument if not self._is_pattern(a)]
+        patterns_match = {}
+        for p in patterns:
+            for k in self.state.keys():
+                if fnmatchcase(k, p):
+                    patterns_match[k] = self.state.get(k)
+        keys_match = dict((key, self.state.get(key)) for key in keys)
+        return dict(patterns_match.items() + keys_match.items())
+
+
+    def get_request(self, arguments):
+        argument, options = arguments
+        def is_pattern(s):
+            return '*' in s or '?' in s or '[' in s or ']' in s
+        if len(argument) == 1 and not is_pattern(argument[0]):
+            return self.state.get(argument[0])
+        patterns = [a for a in argument if is_pattern(a)]
+        keys = [a for a in argument if not is_pattern(a)]
+        patterns_match = {}
+        for p in patterns:
+            for k in self.state.keys():
+                if fnmatchcase(k, p):
+                    patterns_match[k] = self.state.get(k)
+        keys_match = dict((key, self.state.get(key)) for key in keys)
+        return dict(patterns_match.items() + keys_match.items())
 
     def set_request(self, data):
         for key, value in data.items():
             self.state[key] = value
             #if key not in self.state:
             #    self.state[key] = []
-            #self.state[key].append((datetime.isoformat(), value))
+            #self.state[key].append((datetime.now().isoformat(), value))
 
 
 class DumpCenter(object):
@@ -81,9 +107,9 @@ class DumpCenter(object):
         with DumpProtocol(self.address) as protocol:
             protocol.send(['set', data])
 
-    def get(self, key):
+    def get(self, *arg, **kw):
         with DumpProtocol(self.address) as protocol:
-            protocol.send(['get', key])
+            protocol.send(['get', [arg, kw]])
             return protocol.receive()
 
     def die(self):

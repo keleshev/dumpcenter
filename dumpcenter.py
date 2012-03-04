@@ -34,6 +34,7 @@ class DumpProtocol(object):
         return self
 
     def send(self, message):
+        assert '\n' not in json.dumps(message)
         self._client.send(json.dumps(message) + '\n')
 
     def receive(self):
@@ -52,8 +53,8 @@ class DumpProtocol(object):
 class DumpCenterServer(object):
 
     def __init__(self, port=1042, period=0.5):
+        self.dump = Dump()
         self.period = period
-        self.state = {}
         self.server = socket.socket()
         #self.server.bind((socket.gethostname(), port))
         self.server.bind(('', port))
@@ -63,60 +64,13 @@ class DumpCenterServer(object):
             with DumpProtocol(client=client) as protocol:
                 command, argument = protocol.receive()
                 if command == 'get':
-                    protocol.send(self.get_request(argument))
+                    protocol.send(self.dump.get(*argument[0], **argument[1]))
                 elif command == 'set':
-                    self.set_request(argument)
+                    self.dump.set(argument)
                 elif command == 'clr':
-                    self.state = {}
+                    self.dump.clr()
         #self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
-
-    def _truncate(self):
-        now = datetime.now()
-        for key in self.state:
-            self.state[key] = [(t, v) for (t, v) in self.state[key]
-                               if (now - t).seconds > self.period]
-
-    def _is_pattern(self, s):
-        return '*' in s or '?' in s or '[' in s or ']' in s
-
-    def _get_match(self, argument):
-        patterns = [a for a in argument if self._is_pattern(a)]
-        keys = [a for a in argument if not self._is_pattern(a)]
-        patterns_match = {}
-        for p in patterns:
-            for k in self.state.keys():
-                if fnmatchcase(k, p):
-                    patterns_match[k] = self.state.get(k)
-        keys_match = dict((key, self.state.get(key)) for key in keys)
-        return dict(patterns_match.items() + keys_match.items())
-
-    def get_request(self, arguments):
-        argument, options = arguments
-        #self._truncate()
-        match = self._get_match(argument)
-        if options.get('period'):
-            for key in match:
-                if match[key]:
-                    match[key] = zip(*match[key])[1]
-                else:
-                    match[key] = None
-        else:
-            for key in match:
-                if match[key]:
-                    match[key] = match[key][-1][1]
-                else:
-                    match[key] = None
-        if len(argument) == 1 and not self._is_pattern(argument[0]):
-            return match.get(argument[0])
-        return match
-
-    def set_request(self, data):
-        for key, value in data.items():
-            #self.state[key] = value
-            if key not in self.state:
-                self.state[key] = []
-            self.state[key].append((datetime.now().isoformat(), value))
 
 
 class DumpCenter(object):
@@ -186,7 +140,7 @@ class Dump(object):
     def _truncate(self):
         now = datetime.now()
         for key in self._state:
-            self._state[key] = [(t, v) for (t, v) in self._state[key]
+            self._state[key] = [[t, v] for [t, v] in self._state[key]
                                if (now - t).seconds > self.period]
 
     def _is_pattern(self, s):

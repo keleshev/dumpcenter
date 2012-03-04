@@ -2,7 +2,7 @@
 #from multiprocessing import Process
 #from time import sleep
 from time import sleep
-from dumpcenter import Dump#Center#, DumpCenterServer
+from dumpcenter import DumpCenter#, DumpCenterServer
 
 #thread = None
 
@@ -17,7 +17,7 @@ from dumpcenter import Dump#Center#, DumpCenterServer
 
 
 def pytest_funcarg__dump(request):
-    dump = Dump()
+    dump = DumpCenter()
     dump.clr()
     return dump
 

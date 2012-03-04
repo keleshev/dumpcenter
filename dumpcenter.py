@@ -68,8 +68,6 @@ class DumpCenterServer(object):
                     self.set_request(argument)
                 elif command == 'clr':
                     self.state = {}
-                elif command == 'die':
-                    break
         #self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
 
@@ -136,13 +134,66 @@ class DumpCenter(object):
             protocol.send(['get', [arg, kw]])
             return protocol.receive()
 
-    def die(self):
-        with DumpProtocol(self.address) as protocol:
-            protocol.send(['die', None])
-
     def clr(self):
         with DumpProtocol(self.address) as protocol:
             protocol.send(['clr', None])
+
+
+class Dump(object):
+
+    def __init__(self, address='localhost:1042'):
+        self._state = {}
+
+    def set(self, *arg, **kw):
+        data = arg[0] if arg else kw
+        for key, value in data.items():
+            #self._state[key] = value
+            if key not in self._state:
+                self._state[key] = []
+            self._state[key].append([datetime.now().isoformat(), value])
+
+    def _get_match(self, argument):
+        patterns = [a for a in argument if self._is_pattern(a)]
+        keys = [a for a in argument if not self._is_pattern(a)]
+        patterns_match = {}
+        for p in patterns:
+            for k in self._state.keys():
+                if fnmatchcase(k, p):
+                    patterns_match[k] = self._state.get(k)
+        keys_match = dict((key, self._state.get(key)) for key in keys)
+        return dict(patterns_match.items() + keys_match.items())
+
+    def get(self, *arg, **kw):
+        argument, options = arg, kw
+        #self._truncate()
+        match = self._get_match(argument)
+        if options.get('period'):
+            for key in match:
+                if match[key]:
+                    match[key] = list(zip(*match[key])[1])
+                else:
+                    match[key] = None
+        else:
+            for key in match:
+                if match[key]:
+                    match[key] = match[key][-1][1]
+                else:
+                    match[key] = None
+        if len(argument) == 1 and not self._is_pattern(argument[0]):
+            return match.get(argument[0])
+        return match
+
+    def _truncate(self):
+        now = datetime.now()
+        for key in self._state:
+            self._state[key] = [(t, v) for (t, v) in self._state[key]
+                               if (now - t).seconds > self.period]
+
+    def _is_pattern(self, s):
+        return '*' in s or '?' in s or '[' in s or ']' in s
+
+    def clr(self):
+        self._state = {}
 
 
 if __name__ == '__main__':

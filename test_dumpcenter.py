@@ -103,6 +103,6 @@ def test_old_values_are_discarded(dump):
 
 #def test_timestamps():
 #def test_period_with_timestamps():
-#def test_mean()"
+#def test_mean()
 
 

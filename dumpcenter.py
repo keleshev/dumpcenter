@@ -53,8 +53,7 @@ class DumpProtocol(object):
 class DumpCenterServer(object):
 
     def __init__(self, port=1042, period=0.5):
-        self.dump = Dump()
-        self.period = period
+        self.dump = Dump(period)
         self.server = socket.socket()
         #self.server.bind((socket.gethostname(), port))
         self.server.bind(('', port))
@@ -95,7 +94,8 @@ class DumpCenter(object):
 
 class Dump(object):
 
-    def __init__(self, address='localhost:1042'):
+    def __init__(self, period):
+        self._period = period
         self._state = {}
 
     def set(self, *arg, **kw):
@@ -104,7 +104,7 @@ class Dump(object):
             #self._state[key] = value
             if key not in self._state:
                 self._state[key] = []
-            self._state[key].append([datetime.now().isoformat(), value])
+            self._state[key].append([datetime.now(), value])
 
     def _get_match(self, argument):
         patterns = [a for a in argument if self._is_pattern(a)]
@@ -119,7 +119,7 @@ class Dump(object):
 
     def get(self, *arg, **kw):
         argument, options = arg, kw
-        #self._truncate()
+        self._truncate()
         match = self._get_match(argument)
         if options.get('period'):
             for key in match:
@@ -139,9 +139,11 @@ class Dump(object):
 
     def _truncate(self):
         now = datetime.now()
+        print self._state
         for key in self._state:
             self._state[key] = [[t, v] for [t, v] in self._state[key]
-                               if (now - t).seconds > self.period]
+                                if (now - t).total_seconds() < self._period]
+        print self._state
 
     def _is_pattern(self, s):
         return '*' in s or '?' in s or '[' in s or ']' in s

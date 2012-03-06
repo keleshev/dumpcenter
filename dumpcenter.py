@@ -52,8 +52,8 @@ class DumpProtocol(object):
 
 class DumpCenterServer(object):
 
-    def __init__(self, port=1042, period=0.5):
-        self.dump = Dump(period)
+    def __init__(self, port=1042, lifetime=1):
+        self.dump = Dump(lifetime)
         self.server = socket.socket()
         #self.server.bind((socket.gethostname(), port))
         self.server.bind(('', port))
@@ -94,14 +94,13 @@ class DumpCenter(object):
 
 class Dump(object):
 
-    def __init__(self, period):
-        self._period = period
+    def __init__(self, lifetime=1):
+        self._lifetime = lifetime
         self._state = {}
 
     def set(self, *arg, **kw):
         data = arg[0] if arg else kw
         for key, value in data.items():
-            #self._state[key] = value
             if key not in self._state:
                 self._state[key] = []
             self._state[key].append([datetime.now(), value])
@@ -119,14 +118,28 @@ class Dump(object):
 
     def get(self, *arg, **kw):
         argument, options = arg, kw
-        self._truncate()
+        self._state = self._truncate(self._state, self._lifetime)
         match = self._get_match(argument)
-        if options.get('period'):
+        if options.get('period') and options.get('timestamps'):
+            match = self._truncate(match, options['period'])
+            for key in match:
+                if match[key]:
+                    match[key] = match[key]
+                else:
+                    match[key] = []
+        elif options.get('period'):
+            match = self._truncate(match, options['period'])
             for key in match:
                 if match[key]:
                     match[key] = list(zip(*match[key])[1])
                 else:
-                    match[key] = None
+                    match[key] = []
+        elif options.get('timestamps'):
+            for key in match:
+                if match[key]:
+                    match[key] = match[key][-1]
+                else:
+                    match[key] = []
         else:
             for key in match:
                 if match[key]:
@@ -137,13 +150,12 @@ class Dump(object):
             return match.get(argument[0])
         return match
 
-    def _truncate(self):
+    def _truncate(self, state, period):
         now = datetime.now()
-        print self._state
-        for key in self._state:
-            self._state[key] = [[t, v] for [t, v] in self._state[key]
-                                if (now - t).total_seconds() < self._period]
-        print self._state
+        for key in state:
+            state[key] = [[t, v] for [t, v] in state[key]
+                          if (now - t).total_seconds() < period]
+        return state
 
     def _is_pattern(self, s):
         return '*' in s or '?' in s or '[' in s or ']' in s

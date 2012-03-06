@@ -117,37 +117,41 @@ class Dump(object):
         return dict(patterns_match.items() + keys_match.items())
 
     def get(self, *arg, **kw):
-        argument, options = arg, kw
+        arguments, options = arg, kw
         self._state = self._truncate(self._state, self._lifetime)
-        match = self._get_match(argument)
+        match = self._get_match(arguments)
+        if options.get('period'):
+            match = self._truncate(match, options['period'])
+
         if options.get('period') and options.get('timestamps'):
-            match = self._truncate(match, options['period'])
-            for key in match:
-                if match[key]:
-                    match[key] = match[key]
-                else:
-                    match[key] = []
+            transform = lambda x: x if x else []
         elif options.get('period'):
-            match = self._truncate(match, options['period'])
-            for key in match:
-                if match[key]:
-                    match[key] = list(zip(*match[key])[1])
-                else:
-                    match[key] = []
+            transform = lambda x: list(zip(*x)[1]) if x else []
         elif options.get('timestamps'):
-            for key in match:
-                if match[key]:
-                    match[key] = match[key][-1]
-                else:
-                    match[key] = []
+            transform = lambda x: x[-1] if x else []
         else:
-            for key in match:
-                if match[key]:
-                    match[key] = match[key][-1][1]
-                else:
-                    match[key] = None
-        if len(argument) == 1 and not self._is_pattern(argument[0]):
-            return match.get(argument[0])
+            transform = lambda x: x[-1][1] if x else None
+
+        match = dict((key, transform(val)) for key, val in match.items())
+
+        #for key in match:
+        #    if match[key]:
+        #        if options.get('period') and options.get('timestamps'):
+        #            match[key] = match[key]
+        #        elif options.get('period'):
+        #            match[key] = list(zip(*match[key])[1])
+        #        elif options.get('timestamps'):
+        #            match[key] = match[key][-1]
+        #        else:
+        #            match[key] = match[key][-1][1]
+        #    else:
+        #        if options:
+        #            pass#match[key] = []
+        #        else:
+        #            match[key] = None
+
+        if len(arguments) == 1 and not self._is_pattern(arguments[0]):
+            return match.get(arguments[0])
         return match
 
     def _truncate(self, state, period):

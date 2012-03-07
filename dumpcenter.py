@@ -34,16 +34,25 @@ class DumpProtocol(object):
         return self
 
     def send(self, message):
-        assert '\n' not in json.dumps(message)
-        self._client.send(json.dumps(message) + '\n')
+        def encode_datetime(obj):
+            if isinstance(obj, datetime):
+                return {'__datetime__': str(obj)}
+            raise TypeError(repr(obj) + " is not JSON serializable")
+        #assert '\n' not in json.dumps(message)
+        self._client.send(json.dumps(message, default=encode_datetime) + '\n')
 
     def receive(self):
+        def decode_datetime(obj):
+            if '__datetime__' in obj:
+                return datetime.strptime(obj['__datetime__'],
+                                         '%Y-%m-%d %H:%M:%S.%f')
+            return obj
         message = ''
         while True:
             message += self._client.recv(4096)
             if message.endswith('\n'): # or message == '':
                 break
-        return json.loads(message)
+        return json.loads(message, object_hook=decode_datetime)
 
     def __exit__(self, exception_type, value, traceback):
         #self._client.shutdown(socket.SHUT_RDWR)
@@ -105,17 +114,6 @@ class Dump(object):
                 self._state[key] = []
             self._state[key].append([datetime.now(), value])
 
-    def _get_match(self, argument):
-        patterns = [a for a in argument if self._is_pattern(a)]
-        keys = [a for a in argument if not self._is_pattern(a)]
-        patterns_match = {}
-        for p in patterns:
-            for k in self._state.keys():
-                if fnmatchcase(k, p):
-                    patterns_match[k] = self._state.get(k)
-        keys_match = dict((key, self._state.get(key)) for key in keys)
-        return dict(patterns_match.items() + keys_match.items())
-
     def get(self, *arg, **kw):
         arguments, options = arg, kw
         self._state = self._truncate(self._state, self._lifetime)
@@ -134,25 +132,20 @@ class Dump(object):
 
         match = dict((key, transform(val)) for key, val in match.items())
 
-        #for key in match:
-        #    if match[key]:
-        #        if options.get('period') and options.get('timestamps'):
-        #            match[key] = match[key]
-        #        elif options.get('period'):
-        #            match[key] = list(zip(*match[key])[1])
-        #        elif options.get('timestamps'):
-        #            match[key] = match[key][-1]
-        #        else:
-        #            match[key] = match[key][-1][1]
-        #    else:
-        #        if options:
-        #            pass#match[key] = []
-        #        else:
-        #            match[key] = None
-
         if len(arguments) == 1 and not self._is_pattern(arguments[0]):
             return match.get(arguments[0])
         return match
+
+    def _get_match(self, argument):
+        patterns = [a for a in argument if self._is_pattern(a)]
+        keys = [a for a in argument if not self._is_pattern(a)]
+        patterns_match = {}
+        for p in patterns:
+            for k in self._state.keys():
+                if fnmatchcase(k, p):
+                    patterns_match[k] = self._state.get(k)
+        keys_match = dict((key, self._state.get(key)) for key in keys)
+        return dict(patterns_match.items() + keys_match.items())
 
     def _truncate(self, state, period):
         now = datetime.now()

@@ -5,21 +5,6 @@ from fnmatch import fnmatchcase
 from datetime import datetime
 
 
-#def serialize(obj):
-#    def datetime_handler(obj):
-#        if hasattr(obj, 'isoformat'):
-#            return obj.isoformat()
-#        else:
-#            raise TypeError
-#    message = json.dumps(obj, default=datetime_handler)
-#    assert '\n' not in message
-#    return message
-
-
-#def deserialize(message):
-#    return json.loads(message)
-
-
 class DumpProtocol(object):
 
     def __init__(self, address='localhost:1042', client=None):

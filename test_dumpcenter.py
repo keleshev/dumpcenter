@@ -1,20 +1,6 @@
-#from threading import Thread
-#from multiprocessing import Process
-#from time import sleep
 from time import sleep
 from datetime import datetime
-from dumpcenter import DumpCenter#, DumpCenterServer
-
-#thread = None
-
-#def _setup_module(m):
-#    m.thread = Thread(target=DumpCenterServer)
-#    m.thread.daemon = True
-#    m.thread.start()
-#
-#def _teardown_module(m):
-#    DumpCenter().die()
-#    m.thread.join()
+from dumpcenter import DumpCenter
 
 
 def pytest_funcarg__dump(request):
@@ -151,5 +137,3 @@ def test_get_timestamps_with_period(dump):
     [[t1, v1], [t2, v2]] = d['b']
     assert type(t1) == type(t2) == datetime
     assert v1 == 3 and v2 == 9
-
-

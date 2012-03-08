@@ -1,7 +1,7 @@
 DumpCenter
 ==========
 
-Centralized distributed process-cummunication client-server system
+Centralized distributed process-communication client-server system
 ------------------------------------------------------------------
 
 To pass messages between two processes (possibly distributed over 
@@ -51,7 +51,7 @@ Receive all available messages:
 Receive messages matching pattern (`*`, `?`, and `[]`):
 
     # Process B
-    assert dump.get('*_from[ca]') == {'message_from_c': 'Hello from C.',
+    assert dump.get('*_from_[ca]') == {'message_from_c': 'Hello from C.',
                                       'message_from_a': 'Hello, again, B.'} 
 
 Send compound messages (including datatypes which can be JSON-serialized):
